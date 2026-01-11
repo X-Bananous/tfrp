@@ -1,106 +1,99 @@
 import { state } from '../state.js';
-import { WHEEL_REWARDS } from '../actions/wheel.js';
 
 export const WheelView = () => {
     const turns = state.user.whell_turn || 0;
-    const items = state.currentWheelItems || [];
-    const isSpinning = state.isSpinning;
+    const isOpening = state.isOpening;
+    const openingCrateIdx = state.openingCrateIdx;
 
-    const renderItems = () => {
-        // On n'altère plus la liste selon isSpinning pour éviter les sauts de position du ruban
-        // Si la liste est courte (idle initial), on la multiplie juste pour le visuel
-        const displayItems = items.length < 50 ? [...items, ...items, ...items, ...items] : items;
-        
-        return displayItems.map(item => `
-            <div class="w-[150px] h-[180px] shrink-0 bg-gradient-to-b from-[#1a1a1c] to-black rounded-2xl border-b-4 flex flex-col items-center justify-center p-4 shadow-2xl transition-all" style="border-color: ${item.color}">
-                <div class="w-16 h-16 rounded-2xl mb-4 flex items-center justify-center shadow-inner" style="background-color: ${item.color}20">
-                    <i data-lucide="${item.type === 'money' ? 'banknote' : item.type === 'role' ? 'crown' : 'star'}" class="w-8 h-8" style="color: ${item.color}"></i>
+    const renderCrates = () => {
+        let crates = [];
+        // On affiche toujours au moins 8 caisses pour le visuel
+        const count = Math.max(8, turns);
+        for(let i=0; i < count; i++) {
+            const isTarget = openingCrateIdx === i;
+            const canOpen = turns > 0 && !isOpening;
+            
+            crates.push(`
+                <div class="relative group">
+                    <button onclick="${canOpen ? `actions.openCrate(${i})` : ''}" 
+                        ${!canOpen && !isTarget ? 'disabled' : ''}
+                        class="w-full aspect-square glass-panel rounded-[32px] border border-white/5 bg-[#0a0a0a] flex flex-col items-center justify-center gap-4 transition-all duration-500 
+                        ${canOpen ? 'hover:border-blue-500/50 hover:bg-blue-600/5 hover:scale-[1.02] cursor-pointer' : 'opacity-40 cursor-not-allowed'}
+                        ${isTarget ? 'border-blue-500 bg-blue-600/20 scale-[1.05] animate-pulse shadow-[0_0_50px_rgba(59,130,246,0.3)]' : ''}">
+                        
+                        <div class="relative">
+                            <div class="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-inner group-hover:scale-110 transition-transform">
+                                <i data-lucide="package" class="w-8 h-8 ${isTarget ? 'animate-bounce' : ''}"></i>
+                            </div>
+                            ${canOpen ? '<div class="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#0a0a0a] flex items-center justify-center"><i data-lucide="check" class="w-3 h-3 text-white"></i></div>' : ''}
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="text-[10px] font-black text-white uppercase tracking-widest">${isTarget ? 'DÉCRYPTAGE...' : 'CAISSE SÉCURISÉE'}</div>
+                            <div class="text-[8px] text-gray-500 uppercase font-bold tracking-widest mt-1">LOTERIE NATIONALE</div>
+                        </div>
+                    </button>
                 </div>
-                <div class="text-[10px] font-black text-white uppercase text-center leading-tight tracking-tighter">${item.label}</div>
-                <div class="text-[7px] text-gray-500 font-bold uppercase mt-2 tracking-widest">${item.rarity}</div>
-            </div>
-        `).join('');
+            `);
+        }
+        return crates.join('');
     };
 
-    // Calcul de la marge initiale pour centrer le ruban si on n'est pas en train de tourner
-    const stripStyle = isSpinning 
-        ? `transform: translateX(0);` 
-        : `margin-left: calc(50% - 75px); transform: translateX(0); transition: none;`;
-
     return `
-    <div class="fixed inset-0 z-[500] bg-[#050505] flex flex-col items-center justify-center p-8 animate-fade-in overflow-hidden">
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(59,130,246,0.08),transparent_70%)]"></div>
+    <div class="fixed inset-0 z-[500] bg-[#050505] flex flex-col items-center justify-start p-8 animate-fade-in overflow-hidden">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_rgba(10,132,246,0.08),transparent_70%)]"></div>
         <div class="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
 
-        <div class="relative w-full max-w-6xl flex flex-col items-center">
-            
-            <!-- HEADER -->
-            <div class="mb-12 text-center relative z-10">
-                <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-black uppercase tracking-[0.4em] border border-blue-500/20 mb-4 animate-pulse">
+        <!-- HEADER -->
+        <div class="w-full max-w-6xl flex flex-col md:flex-row items-center justify-between mb-12 relative z-10 shrink-0">
+            <div class="text-center md:text-left mb-8 md:mb-0">
+                <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-black uppercase tracking-[0.4em] border border-blue-500/20 mb-4">
                     Système de Loterie Nationale
                 </div>
-                <h2 class="text-6xl font-black text-white uppercase italic tracking-tighter drop-shadow-2xl">TFRP <span class="text-blue-500">LOOTBOX</span></h2>
-                <div class="mt-8 flex items-center justify-center gap-4">
-                    <div class="bg-white/5 border border-white/10 px-8 py-3 rounded-[24px] backdrop-blur-xl flex items-center gap-4 shadow-2xl">
-                        <div class="text-left">
-                            <div class="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-0.5">Clés d'Accès</div>
-                            <div class="text-3xl font-mono font-black text-yellow-400">${turns}</div>
-                        </div>
-                        <i data-lucide="key" class="w-6 h-6 text-yellow-500/50"></i>
-                    </div>
-                    <button onclick="actions.showProbabilities()" class="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-gray-400 hover:text-white transition-all shadow-xl group" title="Consulter les probabilités">
-                        <i data-lucide="info" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
-                    </button>
-                </div>
+                <h2 class="text-5xl font-black text-white uppercase italic tracking-tighter drop-shadow-2xl">TFRP <span class="text-blue-500">LOOTBOX</span></h2>
             </div>
 
-            <!-- SLIDER CONTAINER (Style CS:GO) -->
-            <div class="relative w-full h-[250px] flex items-center justify-center mb-16 overflow-hidden">
-                <!-- Pointeur Central Fixe -->
-                <div class="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 bg-blue-500 z-[100] shadow-[0_0_20px_rgba(59,130,246,0.8)]">
-                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-blue-500 rotate-45 shadow-lg border-2 border-white/20"></div>
-                    <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-blue-500 rotate-45 shadow-lg border-2 border-white/20"></div>
-                </div>
-
-                <!-- Effets de dégradé sur les bords -->
-                <div class="absolute inset-y-0 left-0 w-64 bg-gradient-to-r from-[#050505] to-transparent z-20 pointer-events-none"></div>
-                <div class="absolute inset-y-0 right-0 w-64 bg-gradient-to-l from-[#050505] to-transparent z-20 pointer-events-none"></div>
-
-                <!-- Ruban des items -->
-                <div class="w-full h-full border-y border-white/5 bg-black/40 flex items-center">
-                    <div id="case-strip" 
-                         class="flex gap-[10px] ${!isSpinning && items.length < 50 ? 'animate-lootbox-idle' : ''}" 
-                         style="${stripStyle}">
-                        ${renderItems()}
+            <div class="flex items-center gap-4">
+                <div class="bg-white/5 border border-white/10 px-8 py-3 rounded-[24px] backdrop-blur-xl flex items-center gap-4 shadow-2xl">
+                    <div class="text-left">
+                        <div class="text-[9px] text-gray-600 font-black uppercase tracking-widest mb-0.5">Clés d'Accès</div>
+                        <div class="text-3xl font-mono font-black text-yellow-400">${turns}</div>
                     </div>
+                    <i data-lucide="key" class="w-6 h-6 text-yellow-500/50"></i>
                 </div>
-            </div>
-
-            <!-- ACTIONS -->
-            <div class="flex flex-col items-center gap-8 relative z-10">
-                <button onclick="actions.spinWheel()" 
-                    ${isSpinning || turns <= 0 ? 'disabled' : ''}
-                    class="h-24 px-24 rounded-[32px] font-black text-2xl uppercase italic tracking-widest transition-all transform active:scale-95 shadow-2xl
-                    ${isSpinning || turns <= 0 ? 'bg-white/5 text-gray-700 cursor-not-allowed border border-white/5' : 'bg-white text-black hover:bg-blue-600 hover:text-white shadow-blue-900/40'}">
-                    ${isSpinning ? 'DÉCRYPTAGE EN COURS...' : 'OUVRIR LA CAISSE'}
+                <button onclick="actions.showProbabilities()" class="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-gray-400 hover:text-white transition-all shadow-xl group" title="Consulter les probabilités">
+                    <i data-lucide="info" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
                 </button>
-                
-                ${!isSpinning ? `
-                    <button onclick="actions.closeWheel()" 
-                        class="px-10 py-3 rounded-2xl bg-white/5 border border-white/5 text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] hover:text-white hover:bg-white/10 transition-all flex items-center gap-3">
-                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                        Quitter le Terminal
-                    </button>
-                ` : ''}
+                <button onclick="actions.closeWheel()" class="p-4 bg-white/5 hover:bg-red-600/20 border border-white/10 rounded-2xl text-gray-400 hover:text-red-500 transition-all shadow-xl">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
             </div>
         </div>
 
+        <!-- MAIN AREA -->
+        <div class="w-full max-w-6xl flex-1 overflow-y-auto custom-scrollbar pr-4 relative z-10">
+            ${turns === 0 && !isOpening ? `
+                <div class="h-full flex flex-col items-center justify-center text-center py-20 opacity-40">
+                    <div class="w-32 h-32 rounded-full bg-gray-800/30 flex items-center justify-center mb-8 border border-white/5">
+                        <i data-lucide="lock" class="w-16 h-16 text-gray-600"></i>
+                    </div>
+                    <h3 class="text-2xl font-black text-white uppercase tracking-widest italic">Signal Interrompu</h3>
+                    <p class="text-gray-500 mt-4 max-w-md uppercase font-bold text-[10px] tracking-widest leading-relaxed">
+                        Vous n'avez plus de clés d'accès. <br>Rejoignez le Discord ou boostez le serveur pour obtenir de nouveaux jetons.
+                    </p>
+                </div>
+            ` : `
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 pb-20">
+                    ${renderCrates()}
+                </div>
+            `}
+        </div>
+
         <!-- FOOTER INFO -->
-        <div class="fixed bottom-10 left-10 opacity-30 flex items-center gap-4">
-            <i data-lucide="shield-check" class="w-6 h-6 text-blue-500"></i>
+        <div class="fixed bottom-10 left-1/2 -translate-x-1/2 opacity-30 flex items-center gap-4 bg-black/40 px-6 py-2 rounded-full border border-white/5 backdrop-blur-xl">
+            <i data-lucide="shield-check" class="w-5 h-5 text-blue-500"></i>
             <div class="text-[9px] text-gray-500 font-mono uppercase tracking-[0.3em] leading-relaxed">
-                Algorithme Certifié v4.6.2 Platinum Edition<br>
-                Protection anti-screenshot active
+                Algorithme Certifié v4.6.2 Platinum Edition • Sélection Aléatoire Chiffrée
             </div>
         </div>
     </div>

@@ -2,8 +2,6 @@ import { state } from '../state.js';
 import { render, router } from '../utils.js';
 import { ui } from '../ui.js';
 
-export const SLOT_WIDTH = 160; 
-
 const SoundEngine = {
     ctx: null,
     init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
@@ -58,53 +56,40 @@ export const WHEEL_REWARDS = [
     { label: '???', weight: 1.5, type: 'special', color: '#f472b6', rarity: 'Unique' }
 ];
 
-export const spinWheel = async () => {
+export const openCrate = async (crateIdx) => {
     SoundEngine.init();
     const turns = state.user.whell_turn || 0;
-    if (state.isSpinning || turns <= 0) return;
+    if (state.isOpening || turns <= 0) return;
     if (state.characters.length === 0) return ui.showToast("Dossier citoyen requis.", "error");
 
-    const totalWeight = WHEEL_REWARDS.reduce((acc, r) => acc + r.weight, 0);
-    let randomVal = Math.random() * totalWeight;
-    let winner = WHEEL_REWARDS[0];
-    for (const reward of WHEEL_REWARDS) {
-        randomVal -= reward.weight;
-        if (randomVal <= 0) { 
-            winner = reward; 
-            break; 
-        }
-    }
-
-    const currentWinner = { ...winner };
-    state.lastWheelWinner = currentWinner;
-
-    const stripItems = [];
-    for (let i = 0; i < 100; i++) {
-        if (i === 80) stripItems.push(currentWinner);
-        else stripItems.push(WHEEL_REWARDS[Math.floor(Math.random() * WHEEL_REWARDS.length)]);
-    }
-
-    state.currentWheelItems = stripItems;
-    state.isSpinning = true;
+    state.isOpening = true;
+    state.openingCrateIdx = crateIdx;
     render();
 
-    setTimeout(() => {
-        const strip = document.getElementById('case-strip');
-        if (strip) {
-            strip.style.transition = 'none'; 
-            strip.style.transform = 'translateX(0)'; 
-            strip.offsetHeight; 
-            const targetX = (80 * SLOT_WIDTH) + Math.floor(Math.random() * 60) - 30;
-            strip.style.transition = 'transform 8.5s cubic-bezier(0.12, 0, 0.05, 1)';
-            strip.style.transform = `translateX(-${targetX}px)`;
-        }
-    }, 50);
-
+    // Simulation de décryptage / ouverture
     setTimeout(async () => {
+        const totalWeight = WHEEL_REWARDS.reduce((acc, r) => acc + r.weight, 0);
+        let randomVal = Math.random() * totalWeight;
+        let winner = WHEEL_REWARDS[0];
+        for (const reward of WHEEL_REWARDS) {
+            randomVal -= reward.weight;
+            if (randomVal <= 0) { 
+                winner = reward; 
+                break; 
+            }
+        }
+
+        const currentWinner = { ...winner };
+        state.lastWheelWinner = currentWinner;
+        
         SoundEngine.success();
+        
         const newTurns = turns - 1;
         await state.supabase.from('profiles').update({ whell_turn: newTurns }).eq('id', state.user.id);
         state.user.whell_turn = newTurns;
+
+        state.isOpening = false;
+        state.openingCrateIdx = null;
 
         if (currentWinner.type === 'money') {
             showCharacterChoiceModal(currentWinner);
@@ -112,7 +97,7 @@ export const spinWheel = async () => {
             showSecureScreenshotModal(currentWinner);
         }
         render();
-    }, 9000);
+    }, 2000);
 };
 
 const showCharacterChoiceModal = (reward) => {
@@ -156,7 +141,6 @@ export const claimMoneyReward = async (value, charId) => {
         }
     } catch(e) { ui.showToast("Erreur versement.", "error"); }
     
-    state.isSpinning = false; 
     ui.forceCloseModal();
     render();
 };
@@ -200,7 +184,6 @@ const showSecureScreenshotModal = (reward) => {
                 btn.classList.add('bg-white', 'text-black');
                 
                 btn.onclick = () => {
-                    state.isSpinning = false;
                     ui.forceCloseModal();
                     render();
                 };
@@ -209,8 +192,8 @@ const showSecureScreenshotModal = (reward) => {
     }
 };
 
-export const openWheel = () => { state.currentView = 'wheel'; state.isSpinning = false; state.currentWheelItems = Array(20).fill(0).map(() => WHEEL_REWARDS[Math.floor(Math.random() * WHEEL_REWARDS.length)]); render(); };
-export const closeWheel = () => { if (state.isSpinning) return; state.currentView = 'select'; render(); };
+export const openWheel = () => { state.currentView = 'wheel'; state.isOpening = false; render(); };
+export const closeWheel = () => { if (state.isOpening) return; state.currentView = 'select'; render(); };
 export const showProbabilities = () => {
     const totalWeight = WHEEL_REWARDS.reduce((acc, r) => acc + r.weight, 0);
     const sorted = [...WHEEL_REWARDS].sort((a,b) => b.weight - a.weight);

@@ -338,14 +338,19 @@ const handleLegacySession = async (token) => {
         
         const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', { headers: { Authorization: `Bearer ${token}` } });
         const guilds = await guildsRes.json();
-        if (!Array.isArray(guilds) || !guilds.some(g => g.id === CONFIG.REQUIRED_GUILD_ID)) { 
+        
+        // On récupère le profil
+        const { data: profile } = await state.supabase.from('profiles').select('*').eq('id', discordUser.id).maybeSingle();
+        
+        const isFounder = state.adminIds.includes(discordUser.id);
+
+        if (!isFounder && (!Array.isArray(guilds) || !guilds.some(g => g.id === CONFIG.REQUIRED_GUILD_ID))) { 
             router('access_denied'); 
             appEl.classList.remove('opacity-0', 'pointer-events-none'); 
             return; 
         }
         
         await state.supabase.from('profiles').upsert({ id: discordUser.id, username: discordUser.username, avatar_url: `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`, updated_at: new Date() });
-        const { data: profile } = await state.supabase.from('profiles').select('*').eq('id', discordUser.id).maybeSingle();
         
         // CHECK BANS
         let isBanned = false;
@@ -361,9 +366,9 @@ const handleLegacySession = async (token) => {
             permissions: profile?.permissions || {}, 
             deletion_requested_at: profile?.deletion_requested_at || null, 
             whell_turn: profile?.whell_turn || 0,
-            isFounder: state.adminIds.includes(discordUser.id), 
+            isFounder: isFounder, 
             isBanned: isBanned, 
-            guilds: guilds.map(g => g.id) 
+            guilds: Array.isArray(guilds) ? guilds.map(g => g.id) : []
         };
         window.history.replaceState({}, document.title, window.location.pathname);
         
@@ -396,7 +401,6 @@ const handleAuthenticatedSession = async (session) => {
         if (!supabaseUser) throw new Error("Supabase user not found");
 
         const discordUser = supabaseUser.user_metadata;
-        // CRUCIAL : On récupère l'ID Discord Snowflake (provider_id) et non le UUID Supabase
         const discordId = discordUser.provider_id || discordUser.sub;
         
         if (!discordId) throw new Error("Impossible de résoudre l'ID Discord.");
@@ -412,7 +416,8 @@ const handleAuthenticatedSession = async (session) => {
         });
 
         const { data: profile } = await state.supabase.from('profiles').select('*').eq('id', discordId).maybeSingle();
-        
+        const isFounder = state.adminIds.includes(discordId);
+
         // CHECK BANS
         let isBanned = false;
         try {
@@ -427,9 +432,9 @@ const handleAuthenticatedSession = async (session) => {
             permissions: profile?.permissions || {}, 
             deletion_requested_at: profile?.deletion_requested_at || null, 
             whell_turn: profile?.whell_turn || 0,
-            isFounder: state.adminIds.includes(discordId), 
+            isFounder: isFounder, 
             isBanned: isBanned,
-            guilds: [] 
+            guilds: [] // Guilds will be fetched if needed, or founders bypass
         };
         
         appEl.classList.add('opacity-0', 'pointer-events-none');

@@ -6,13 +6,60 @@ export const StaffSanctionsView = () => {
     const globalSanctions = state.globalSanctions || [];
     const targetHistory = state.activeSanctionTargetHistory || [];
 
+    // On isole les contestations actives (sanctions avec appeal_at non null)
+    const activeAppeals = globalSanctions.filter(s => s.appeal_at !== null);
+
     return `
         <div class="h-full flex flex-col gap-8 animate-fade-in overflow-y-auto custom-scrollbar pr-2 pb-20">
+            
+            ${activeAppeals.length > 0 ? `
+                <!-- APPEALS SECTION (PRIORITY) -->
+                <div class="space-y-4 shrink-0">
+                    <h3 class="text-xs font-black text-blue-400 uppercase tracking-[0.4em] flex items-center gap-4 px-2">
+                        <span class="w-8 h-px bg-blue-500/30"></span> Contestations en Attente (${activeAppeals.length})
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        ${activeAppeals.map(s => {
+                            const tColor = s.type === 'warn' ? 'yellow' : s.type === 'mute' ? 'orange' : 'red';
+                            return `
+                                <div class="glass-panel p-6 rounded-[32px] border border-blue-500/30 bg-blue-900/[0.02] relative overflow-hidden group">
+                                    <div class="absolute top-0 right-0 p-3">
+                                        <i data-lucide="bell" class="w-5 h-5 text-blue-500/50 animate-pulse"></i>
+                                    </div>
+                                    <div class="flex items-center gap-4 mb-4">
+                                        <img src="${s.target?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="w-12 h-12 rounded-xl border border-white/10 object-cover">
+                                        <div>
+                                            <div class="font-black text-white text-base uppercase italic tracking-tight">${s.target?.username || 'Citoyen Inconnu'}</div>
+                                            <div class="text-[8px] text-gray-500 uppercase font-black">Appel déposé le ${new Date(s.appeal_at).toLocaleDateString()}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="space-y-4">
+                                        <div class="bg-black/40 p-4 rounded-2xl border border-white/5">
+                                            <div class="text-[8px] text-gray-600 font-black uppercase mb-1">Sanction d'origine (${s.type})</div>
+                                            <p class="text-[11px] text-gray-400 italic">"${s.reason}"</p>
+                                        </div>
+                                        <div class="bg-blue-600/10 p-4 rounded-2xl border border-blue-500/20">
+                                            <div class="text-[8px] text-blue-400 font-black uppercase mb-1">Argumentaire de défense</div>
+                                            <p class="text-xs text-white leading-relaxed">"${s.appeal_text}"</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-3 mt-6">
+                                        <button onclick="actions.decideSanctionAppeal('${s.id}', 'approve')" class="py-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 font-black text-[9px] uppercase tracking-widest transition-all">Accepter (Purge)</button>
+                                        <button onclick="actions.decideSanctionAppeal('${s.id}', 'reject')" class="py-3 rounded-xl bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 font-black text-[9px] uppercase tracking-widest transition-all">Rejeter</button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0">
                 
                 <!-- LEFT: SEARCH & TARGET -->
                 <div class="lg:col-span-5 flex flex-col gap-6">
-                    <!-- On garde le no-overflow-clipping UNIQUEMENT sur le conteneur du dropdown pour éviter les coupures -->
                     <div class="glass-panel p-8 rounded-[40px] border border-white/5 bg-[#0a0a0a] shadow-2xl relative no-overflow-clipping">
                         <h3 class="font-black text-white text-lg uppercase italic tracking-tighter mb-6 flex items-center gap-3">
                             <i data-lucide="search" class="w-5 h-5 text-purple-400"></i> Rechercher Cible
@@ -112,8 +159,9 @@ export const StaffSanctionsView = () => {
                             ` : globalSanctions.map(s => {
                                 const tColor = s.type === 'warn' ? 'yellow' : s.type === 'mute' ? 'orange' : 'red';
                                 const canRevoke = state.user?.isFounder || s.staff_id === state.user?.id;
+                                const isAppealed = !!s.appeal_at;
                                 return `
-                                    <div class="p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-${tColor}-500/30 transition-all group relative">
+                                    <div class="p-4 bg-white/[0.02] border ${isAppealed ? 'border-blue-500/30 bg-blue-500/[0.02]' : 'border-white/5'} rounded-2xl hover:border-${tColor}-500/30 transition-all group relative">
                                         <div class="flex justify-between items-start mb-2">
                                             <div class="flex items-center gap-3">
                                                 <div class="w-8 h-8 rounded-lg bg-${tColor}-500/10 flex items-center justify-center text-${tColor}-400 border border-${tColor}-500/20 font-black text-[9px]">${s.type.toUpperCase()}</div>
@@ -122,11 +170,14 @@ export const StaffSanctionsView = () => {
                                                     <div class="text-[8px] text-gray-500 font-mono">Par: ${s.staff?.username || 'Système'} • ${new Date(s.created_at).toLocaleString()}</div>
                                                 </div>
                                             </div>
-                                            ${canRevoke ? `
-                                                <button onclick="actions.revokeSanction('${s.id}')" class="p-2 text-red-500 hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all" title="Annuler Sanction">
-                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                                </button>
-                                            ` : ''}
+                                            <div class="flex items-center gap-2">
+                                                ${isAppealed ? '<span class="text-[7px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black uppercase shadow-lg animate-pulse">APPEL</span>' : ''}
+                                                ${canRevoke ? `
+                                                    <button onclick="actions.revokeSanction('${s.id}')" class="p-2 text-red-500 hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all" title="Annuler Sanction">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                ` : ''}
+                                            </div>
                                         </div>
                                         <div class="text-[11px] text-gray-400 italic bg-black/40 p-2 rounded-xl border border-white/5">"${s.reason}"</div>
                                     </div>

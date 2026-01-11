@@ -28,7 +28,11 @@ const refreshBanner = `
 `;
 
 export const StaffView = () => {
-    if (!state.user.guilds || !state.user.guilds.includes(CONFIG.GUILD_STAFF)) {
+    const isFounder = state.user?.isFounder || state.adminIds.includes(state.user?.id);
+    const isInStaffGuild = state.user?.guilds?.includes(CONFIG.GUILD_STAFF);
+
+    // Un fondateur a toujours accès, un staff doit être dans la guild
+    if (!isFounder && !isInStaffGuild) {
          return `
             <div class="h-full flex flex-col items-center justify-center p-8 text-center animate-fade-in bg-[#050505]">
                 <div class="glass-panel max-w-md w-full p-10 rounded-[48px] border-purple-500/30 shadow-[0_0_80px_rgba(168,85,247,0.1)] relative overflow-hidden">
@@ -47,7 +51,7 @@ export const StaffView = () => {
          `;
     }
 
-    const hasAnyPerm = Object.keys(state.user.permissions || {}).length > 0 || state.user.isFounder;
+    const hasAnyPerm = Object.keys(state.user.permissions || {}).length > 0 || isFounder;
     if (!hasAnyPerm) return `<div class="p-20 text-center text-red-500 font-black uppercase tracking-widest italic animate-pulse">Accès refusé • Violation du protocole d'accréditation</div>`;
 
     const isOnDuty = state.onDutyStaff?.some(s => s.id === state.user.id);
@@ -75,7 +79,7 @@ export const StaffView = () => {
         { id: 'permissions', label: 'Perms', icon: 'lock', perm: 'can_manage_staff' },
         { id: 'sessions', label: 'Sessions', icon: 'server', perm: 'can_launch_session' },
         { id: 'logs', label: 'Logs', icon: 'scroll-text', perm: 'can_execute_commands' }
-    ].filter(t => hasPermission(t.perm) || state.user.isFounder || t.id === 'citizens');
+    ].filter(t => hasPermission(t.perm) || isFounder || t.id === 'citizens');
 
     const MAX_VISIBLE_TABS = 5;
     const visibleTabs = allTabs.slice(0, MAX_VISIBLE_TABS);
@@ -114,7 +118,6 @@ export const StaffView = () => {
                                 <button class="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all whitespace-nowrap shrink-0 ${isCurrentInHidden ? 'bg-purple-900/40 text-purple-400 border border-purple-500/30' : 'text-gray-500 hover:text-white'}">
                                     <i data-lucide="more-horizontal" class="w-4 h-4"></i> Voir Plus
                                 </button>
-                                <!-- PADDING-TOP POUR LE PONT DE SURVOL -->
                                 <div class="absolute right-0 top-full pt-2 w-48 opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all z-[100]">
                                     <div class="glass-panel border border-white/10 rounded-2xl shadow-2xl flex flex-col p-2 overflow-hidden bg-[#0a0a0c]">
                                         ${hiddenTabs.map(t => `

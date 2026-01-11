@@ -61,7 +61,7 @@ export const setStaffTab = async (tab) => {
     }
 };
 
-// SANCTION ACTIONS (FIXED SEARCH)
+// SANCTION ACTIONS
 export const searchUserForSanction = async (query) => {
     const container = document.getElementById('sanction-search-results');
     if (!container) return;
@@ -168,6 +168,34 @@ export const revokeSanction = async (sanctionId) => {
             } else {
                 ui.showToast("Échec de la révocation.", "error");
             }
+        }
+    });
+};
+
+export const decideSanctionAppeal = async (sanctionId, decision) => {
+    const sanction = state.globalSanctions.find(s => s.id === sanctionId);
+    if (!sanction) return;
+
+    ui.showModal({
+        title: decision === 'approve' ? "Accepter la contestation" : "Rejeter la contestation",
+        content: decision === 'approve' 
+            ? `En acceptant, la sanction sera <b>définitivement supprimée</b> du casier de ${sanction.target?.username}.`
+            : `En rejetant, l'appel sera effacé mais la <b>sanction sera maintenue</b>.`,
+        confirmText: "Confirmer la décision",
+        type: decision === 'approve' ? "success" : "danger",
+        onConfirm: async () => {
+            if (decision === 'approve') {
+                await state.supabase.from('sanctions').delete().eq('id', sanctionId);
+                ui.showToast("Contestation acceptée. Sanction purgée.", "success");
+            } else {
+                await state.supabase.from('sanctions').update({
+                    appeal_text: null,
+                    appeal_at: null
+                }).eq('id', sanctionId);
+                ui.showToast("Contestation rejetée. Sanction maintenue.", "info");
+            }
+            await services.fetchGlobalSanctions();
+            render();
         }
     });
 };
